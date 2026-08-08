@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 
 const userRoutes = require("./routes/userRoutes");
+const workerRoutes = require("./routes/workerRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,6 +20,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/api/users", userRoutes);
+app.use("/api/workers", workerRoutes);
 
 app.get("/", (req, res) => {
     res.send("Trade Backend API is running");
