@@ -8,10 +8,13 @@ const {
     deleteWorker
 } = require("../controllers/workerController");
 
+const protect = require("../middleware/authMiddleware");
+const authorizeRoles = require("../middleware/roleMiddleware");
+
 const router = express.Router();
 
-// Create a new worker
-router.post("/", createWorker);
+// Create a new worker - worker only
+router.post("/", protect, authorizeRoles("worker"), createWorker);
 
 // Get all workers
 router.get("/", getWorkers);
