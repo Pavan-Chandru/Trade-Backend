@@ -22,10 +22,8 @@ router.get("/", getWorkers);
 // Get worker by ID
 router.get("/:id", getWorkerById);
 
-// Update worker
-router.put("/:id", updateWorker);
+router.put("/:id", protect, authorizeRoles("worker"), updateWorker);
 
-// Delete worker
-router.delete("/:id", deleteWorker);
+router.delete("/:id", protect, authorizeRoles("worker"), deleteWorker);
 
 module.exports = router;

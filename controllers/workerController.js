@@ -3,7 +3,10 @@ const Worker = require("../models/Worker");
 // Create Worker
 exports.createWorker = async (req, res) => {
     try {
-        const worker = await Worker.create(req.body);
+        const worker = await Worker.create({
+        ...req.body,
+        userId: req.user.id
+     });
 
         res.status(201).json({
             success: true,
@@ -60,16 +63,10 @@ exports.getWorkerById = async (req, res) => {
 };
 
 // Update Worker
+// Update Worker
 exports.updateWorker = async (req, res) => {
     try {
-        const worker = await Worker.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            {
-                new: true,
-                runValidators: true
-            }
-        );
+        const worker = await Worker.findById(req.params.id);
 
         if (!worker) {
             return res.status(404).json({
@@ -78,10 +75,23 @@ exports.updateWorker = async (req, res) => {
             });
         }
 
+        // Check ownership
+        if (worker.userId.toString() !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only update your own worker profile"
+            });
+        }
+
+        Object.assign(worker, req.body);
+
+        await worker.save();
+
         res.status(200).json({
             success: true,
             worker
         });
+
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -91,9 +101,10 @@ exports.updateWorker = async (req, res) => {
 };
 
 // Delete Worker
+// Delete Worker
 exports.deleteWorker = async (req, res) => {
     try {
-        const worker = await Worker.findByIdAndDelete(req.params.id);
+        const worker = await Worker.findById(req.params.id);
 
         if (!worker) {
             return res.status(404).json({
@@ -102,10 +113,21 @@ exports.deleteWorker = async (req, res) => {
             });
         }
 
+        // Check ownership
+        if (worker.userId.toString() !== req.user.id) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only delete your own worker profile"
+            });
+        }
+
+        await worker.deleteOne();
+
         res.status(200).json({
             success: true,
             message: "Worker deleted successfully"
         });
+
     } catch (error) {
         res.status(500).json({
             success: false,
