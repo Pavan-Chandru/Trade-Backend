@@ -2,10 +2,13 @@ const express = require("express");
 
 const {
     createJob,
+    getOpenJobs,
     getCustomerJobs,
     getWorkerJobs,
+    getJobById,
     acceptJob,
-    rejectJob
+    rejectJob,
+    cancelJob
 } = require("../controllers/jobController");
 
 const protect = require("../middleware/authMiddleware");
@@ -13,7 +16,14 @@ const authorizeRoles = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-// Customer creates a job request
+
+// ==========================================
+// CUSTOMER ROUTES
+// ==========================================
+
+// Create a job
+// Can be an open job or a direct worker request
+
 router.post(
     "/",
     protect,
@@ -21,7 +31,9 @@ router.post(
     createJob
 );
 
-// Customer views their jobs
+
+// Customer views their own jobs
+
 router.get(
     "/customer",
     protect,
@@ -29,7 +41,33 @@ router.get(
     getCustomerJobs
 );
 
-// Worker views assigned jobs
+
+// Customer cancels their own job
+
+router.put(
+    "/:id/cancel",
+    protect,
+    authorizeRoles("customer"),
+    cancelJob
+);
+
+
+// ==========================================
+// WORKER ROUTES
+// ==========================================
+
+// Worker views open jobs
+
+router.get(
+    "/open",
+    protect,
+    authorizeRoles("worker"),
+    getOpenJobs
+);
+
+
+// Worker views jobs directly assigned to them
+
 router.get(
     "/worker",
     protect,
@@ -37,7 +75,9 @@ router.get(
     getWorkerJobs
 );
 
-// Worker accepts job
+
+// Worker accepts a direct request
+
 router.put(
     "/:id/accept",
     protect,
@@ -45,12 +85,28 @@ router.put(
     acceptJob
 );
 
-// Worker rejects job
+
+// Worker rejects a direct request
+
 router.put(
     "/:id/reject",
     protect,
     authorizeRoles("worker"),
     rejectJob
 );
+
+
+// ==========================================
+// GENERAL ROUTE
+// ==========================================
+
+// Get a specific job
+
+router.get(
+    "/:id",
+    protect,
+    getJobById
+);
+
 
 module.exports = router;

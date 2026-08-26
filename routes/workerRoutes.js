@@ -5,7 +5,8 @@ const {
     getWorkers,
     getWorkerById,
     updateWorker,
-    deleteWorker
+    deleteWorker,
+    updateAvailability
 } = require("../controllers/workerController");
 
 const protect = require("../middleware/authMiddleware");
@@ -18,6 +19,14 @@ router.post("/", protect, authorizeRoles("worker"), createWorker);
 
 // Get all workers
 router.get("/", getWorkers);
+
+
+router.put(
+    "/availability",
+    protect,
+    authorizeRoles("worker"),
+    updateAvailability
+);
 
 // Get worker by ID
 router.get("/:id", getWorkerById);

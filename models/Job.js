@@ -8,10 +8,12 @@ const jobSchema = new mongoose.Schema(
             required: true
         },
 
+        // null = open job
+        // worker ID = direct request / assigned worker
         workerId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Worker",
-            required: true
+            default: null
         },
 
         service: {
@@ -31,9 +33,11 @@ const jobSchema = new mongoose.Schema(
                 type: String,
                 required: true
             },
+
             latitude: {
                 type: Number
             },
+
             longitude: {
                 type: Number
             }
@@ -50,8 +54,6 @@ const jobSchema = new mongoose.Schema(
                 "pending",
                 "accepted",
                 "rejected",
-                "in_progress",
-                "completed",
                 "cancelled"
             ],
             default: "pending"
