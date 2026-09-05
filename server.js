@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 require("dotenv").config();
 
+
+const reviewRoutes = require("./routes/reviewRoutes");
 const userRoutes = require("./routes/userRoutes");
 const workerRoutes = require("./routes/workerRoutes");
 const jobRoutes = require("./routes/jobRoutes");
@@ -20,7 +22,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/workers", workerRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/applications", applicationRoutes);
-
+app.use("/api/reviews", reviewRoutes);
 
 // Root route
 app.get("/", (req, res) => {

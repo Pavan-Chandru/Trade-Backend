@@ -388,3 +388,72 @@ exports.cancelJob = async (req, res) => {
         });
     }
 };
+
+// ==========================================
+// COMPLETE JOB
+// ==========================================
+
+// Only the worker assigned to the job
+// can mark the job as completed.
+
+exports.completeJob = async (req, res) => {
+    try {
+        // Find the worker profile of logged-in user
+        const worker = await Worker.findOne({
+            userId: req.user.id
+        });
+
+        if (!worker) {
+            return res.status(404).json({
+                success: false,
+                message: "Worker profile not found"
+            });
+        }
+
+        // Find the job
+        const job = await Job.findById(req.params.id);
+
+        if (!job) {
+            return res.status(404).json({
+                success: false,
+                message: "Job not found"
+            });
+        }
+
+        // Check whether this worker is assigned to the job
+        if (
+            !job.workerId ||
+            job.workerId.toString() !== worker._id.toString()
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only complete jobs assigned to you"
+            });
+        }
+
+        // Job must be accepted first
+        if (job.status !== "accepted") {
+            return res.status(400).json({
+                success: false,
+                message: `Job cannot be completed because it is ${job.status}`
+            });
+        }
+
+        // Mark job as completed
+        job.status = "completed";
+
+        await job.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Job completed successfully",
+            job
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};

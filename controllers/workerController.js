@@ -34,10 +34,76 @@ exports.createWorker = async (req, res) => {
 };
 
 
-// Get All Workers
+// Get All Workers with Filters
 exports.getWorkers = async (req, res) => {
     try {
-        const workers = await Worker.find();
+        const {
+    profession,
+    availability,
+    skills,
+    minExperience,
+    location,
+    minRating,
+    latitude,
+    longitude,
+    radius
+} = req.query;
+
+        let filter = {};
+
+        // Filter by profession
+        if (profession) {
+            filter.profession = profession;
+        }
+
+        // Filter by availability
+        if (availability !== undefined) {
+            filter.availability = availability === "true";
+        }
+
+        // Filter by skills
+        if (skills) {
+            filter.skills = skills;
+        }
+
+        // Filter by minimum experience
+        if (minExperience !== undefined) {
+            filter.experience = {
+                $gte: Number(minExperience)
+            };
+        }
+
+        // Filter by minimum rating
+        if (minRating !== undefined) {
+           filter.rating = {
+               $gte: Number(minRating)
+            };
+     }  
+
+        // Filter by location
+        if (location) {
+            filter["location.address"] = location;
+        }
+
+        // Filter workers by nearby location
+if (latitude !== undefined && longitude !== undefined) {
+    const radiusInMeters = Number(radius || 10) * 1000;
+
+    filter.location = {
+        $near: {
+            $geometry: {
+                type: "Point",
+                coordinates: [
+                    Number(longitude),
+                    Number(latitude)
+                ]
+            },
+            $maxDistance: radiusInMeters
+        }
+    };
+}
+
+        const workers = await Worker.find(filter);
 
         res.status(200).json({
             success: true,

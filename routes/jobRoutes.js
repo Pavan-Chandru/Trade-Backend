@@ -8,7 +8,8 @@ const {
     getJobById,
     acceptJob,
     rejectJob,
-    cancelJob
+    cancelJob,
+    completeJob
 } = require("../controllers/jobController");
 
 const protect = require("../middleware/authMiddleware");
@@ -106,6 +107,13 @@ router.get(
     "/:id",
     protect,
     getJobById
+);
+
+router.put(
+    "/:id/complete",
+    protect,
+    authorizeRoles("worker"),
+    completeJob
 );
 
 

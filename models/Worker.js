@@ -50,17 +50,22 @@ const workerSchema = new mongoose.Schema(
         },
 
         location: {
-            address: {
-                type: String,
-                default: ""
-            },
-            latitude: {
-                type: Number
-            },
-            longitude: {
-                type: Number
-            }
-        },
+    address: {
+        type: String,
+        default: ""
+    },
+
+    type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point"
+    },
+
+    coordinates: {
+        type: [Number],
+        default: [0, 0]
+    }
+},
 
         availability: {
             type: Boolean,
@@ -81,6 +86,8 @@ const workerSchema = new mongoose.Schema(
         timestamps: true
     }
 );
+
+workerSchema.index({ location: "2dsphere" });
 
 const Worker = mongoose.model("Worker", workerSchema);
 
