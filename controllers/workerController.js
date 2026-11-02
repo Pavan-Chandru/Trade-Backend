@@ -60,8 +60,7 @@ exports.getWorkers = async (req, res) => {
 
         // Escape user input so search terms are treated as plain text.
         const escapeRegex = (value) =>
-            value.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
-
+            value.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
         if (profession?.trim()) {
             filter.profession = {
                 $regex: `^${escapeRegex(profession.trim())}$`,
