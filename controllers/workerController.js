@@ -34,87 +34,205 @@ exports.createWorker = async (req, res) => {
 };
 
 
-// Get All Workers with Filters
+// Get all workers with filtering, sorting and pagination
 exports.getWorkers = async (req, res) => {
     try {
         const {
-    profession,
-    availability,
-    skills,
-    minExperience,
-    location,
-    minRating,
-    latitude,
-    longitude,
-    radius
-} = req.query;
+            profession, availability, skills, minExperience, location,
+            minRating, latitude, longitude, radius,
+            sort = "newest", page = "1", limit = "10"
+        } = req.query;
 
-        let filter = {};
+        const filter = {};
+        const hasLatitude = latitude !== undefined;
+        const hasLongitude = longitude !== undefined;
 
-        // Filter by profession
-        if (profession) {
-            filter.profession = profession;
+        const pageNumber = Number(page);
+        const pageSize = Number(limit);
+
+        if (!Number.isInteger(pageNumber) || pageNumber < 1 ||
+            !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50) {
+            return res.status(400).json({
+                success: false,
+                message: "page must be positive and limit must be between 1 and 50"
+            });
         }
 
-        // Filter by availability
+        // Escape user input so search terms are treated as plain text.
+        const escapeRegex = (value) =>
+            value.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
+
+        if (profession?.trim()) {
+            filter.profession = {
+                $regex: `^${escapeRegex(profession.trim())}$`,
+                $options: "i"
+            };
+        }
+
         if (availability !== undefined) {
+            if (!["true", "false"].includes(availability)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "availability must be true or false"
+                });
+            }
             filter.availability = availability === "true";
         }
 
-        // Filter by skills
-        if (skills) {
-            filter.skills = skills;
+        if (skills !== undefined) {
+            const skillList = skills.split(",").map(s => s.trim()).filter(Boolean);
+            if (!skillList.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Provide at least one valid skill"
+                });
+            }
+            filter.skills = {
+                $in: skillList.map(s => new RegExp(escapeRegex(s), "i"))
+            };
         }
 
-        // Filter by minimum experience
         if (minExperience !== undefined) {
-            filter.experience = {
-                $gte: Number(minExperience)
-            };
+            const value = Number(minExperience);
+            if (!Number.isFinite(value) || value < 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "minExperience must be a non-negative number"
+                });
+            }
+            filter.experience = { $gte: value };
         }
 
-        // Filter by minimum rating
         if (minRating !== undefined) {
-           filter.rating = {
-               $gte: Number(minRating)
+            const value = Number(minRating);
+            if (!Number.isFinite(value) || value < 0 || value > 5) {
+                return res.status(400).json({
+                    success: false,
+                    message: "minRating must be between 0 and 5"
+                });
+            }
+            filter.rating = { $gte: value };
+        }
+
+        if (location?.trim()) {
+            filter["location.address"] = {
+                $regex: escapeRegex(location.trim()),
+                $options: "i"
             };
-     }  
-
-        // Filter by location
-        if (location) {
-            filter["location.address"] = location;
         }
 
-        // Filter workers by nearby location
-if (latitude !== undefined && longitude !== undefined) {
-    const radiusInMeters = Number(radius || 10) * 1000;
-
-    filter.location = {
-        $near: {
-            $geometry: {
-                type: "Point",
-                coordinates: [
-                    Number(longitude),
-                    Number(latitude)
-                ]
-            },
-            $maxDistance: radiusInMeters
+        if (hasLatitude !== hasLongitude) {
+            return res.status(400).json({
+                success: false,
+                message: "Both latitude and longitude are required"
+            });
         }
-    };
-}
 
-        const workers = await Worker.find(filter);
+        const findFilter = { ...filter };
+        const countFilter = { ...filter };
+        let radiusInKm = null;
+
+        if (hasLatitude && hasLongitude) {
+            const lat = Number(latitude);
+            const lng = Number(longitude);
+            radiusInKm = Number(radius === undefined ? 10 : radius);
+
+            if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+                !Number.isFinite(lng) || lng < -180 || lng > 180) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid latitude or longitude"
+                });
+            }
+
+            if (!Number.isFinite(radiusInKm) || radiusInKm <= 0 || radiusInKm > 100) {
+                return res.status(400).json({
+                    success: false,
+                    message: "radius must be greater than 0 and at most 100 km"
+                });
+            }
+
+            const coordinates = [lng, lat];
+
+            // $near returns workers ordered by distance.
+            findFilter.location = {
+                $near: {
+                    $geometry: { type: "Point", coordinates },
+                    $maxDistance: radiusInKm * 1000
+                }
+            };
+
+            // Use $geoWithin for the total count; countDocuments
+            // does not support the $near operator.
+            countFilter.location = {
+                $geoWithin: {
+                    $centerSphere: [coordinates, radiusInKm / 6378.1]
+                }
+            };
+        }
+
+        const sortOptions = {
+            newest: { createdAt: -1 },
+            rating: { rating: -1, completedJobs: -1 },
+            experience: { experience: -1 },
+            "experience-asc": { experience: 1 },
+            jobs: { completedJobs: -1, rating: -1 }
+        };
+
+        if (sort === "nearest" && !hasLatitude) {
+            return res.status(400).json({
+                success: false,
+                message: "Coordinates are required to sort by nearest"
+            });
+        }
+
+        if (!["nearest", ...Object.keys(sortOptions)].includes(sort)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid sort option"
+            });
+        }
+
+        let query = Worker.find(findFilter)
+            .skip((pageNumber - 1) * pageSize)
+            .limit(pageSize);
+
+        // MongoDB $near already sorts by distance.
+        if (sort !== "nearest") query = query.sort(sortOptions[sort]);
+
+        const [workers, totalWorkers] = await Promise.all([
+            query,
+            Worker.countDocuments(countFilter)
+        ]);
 
         res.status(200).json({
             success: true,
             count: workers.length,
+            totalWorkers,
+            pagination: {
+                currentPage: pageNumber,
+                totalPages: Math.ceil(totalWorkers / pageSize),
+                pageSize,
+                hasNextPage: pageNumber * pageSize < totalWorkers,
+                hasPreviousPage: pageNumber > 1
+            },
+            filters: {
+                profession: profession || null,
+                availability: availability ?? null,
+                skills: skills || null,
+                minExperience: minExperience ?? null,
+                minRating: minRating ?? null,
+                location: location || null,
+                radius: radiusInKm,
+                sort
+            },
             workers
         });
-
     } catch (error) {
+        console.error("getWorkers error:", error);
         res.status(500).json({
             success: false,
-            message: error.message
+            message: "Unable to retrieve workers"
         });
     }
 };
